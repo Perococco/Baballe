@@ -19,7 +19,7 @@ namespace Baballe
         public bool CrashedOnWall { get; private set; } = false;
 
 
-        private IPlaygroundDraw Drawer = new BasicPlaygroundDraw();
+        private IPlaygroundDrawer Drawer = new BasicPlaygroundDrawer();
 
         public Game(Playground playground, int SpeedFactor)
         {

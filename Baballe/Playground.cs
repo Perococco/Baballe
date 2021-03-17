@@ -26,9 +26,9 @@ namespace Baballe
 
         public CellType[,] Cells { get; }
 
-        public ISet<Point2D> Borders { get; } = new HashSet<Point2D>();
-        public ISet<Point2D> Coins { get; } = new HashSet<Point2D>();
-        public ISet<Point2D> Walls { get; } = new HashSet<Point2D>();
+        private readonly ISet<Point2D> _borders = new HashSet<Point2D>();
+        private readonly ISet<Point2D> _coins  = new HashSet<Point2D>();
+        private readonly ISet<Point2D> _walls = new HashSet<Point2D>();
         public Vector2 Center { get; private set; }
 
         private Playground(int nbRows, int nbColumns, int cellSize)
@@ -41,6 +41,21 @@ namespace Baballe
             Width = nbColumns * CellSize;
         }
 
+        public IEnumerable<Point2D> Borders()
+        {
+            return _borders;
+        }
+
+        public IEnumerable<Point2D> Coins()
+        {
+            return _coins;
+        }
+
+        public IEnumerable<Point2D> Walls()
+        {
+            return _walls;
+        }
+        
         public void Initialize()
         {
             Center = new Vector2(CellSize * NbColumns * 0.5f, CellSize * NbRows * 0.5f);
@@ -97,13 +112,13 @@ namespace Baballe
 
         private void SetCellType(Point2D position, CellType cellType)
         {
-            Action<Point2D> action = (cellType switch
+            Func<Point2D,bool> action = cellType switch
             {
-                CellType.Border => Borders.Add,
-                CellType.Coin => Coins.Add,
-                CellType.Wall => Walls.Add,
-                _ => p => { },
-            });
+                CellType.Border => _borders.Add,
+                CellType.Coin => _coins.Add,
+                CellType.Wall => _walls.Add,
+                _ => p => true,
+            };
             action.Invoke(position);
         }
 
@@ -125,9 +140,9 @@ namespace Baballe
 
         public bool RemoveCoin(int gridX, int gridY)
         {
-            Coins.Remove(new Point2D(gridX, gridY));
+            _coins.Remove(new Point2D(gridX, gridY));
             Cells[gridX, gridY] = CellType.Empty;
-            return Coins.Count == 0;
+            return _coins.Count == 0;
         }
     }
 }

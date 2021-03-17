@@ -1,6 +1,6 @@
 namespace Baballe
 {
-    public interface IPlaygroundDraw
+    public interface IPlaygroundDrawer
     {
         void Draw(Playground playground);
     }
