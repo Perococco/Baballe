@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Dynamic;
 using System.Numerics;
+using System.Security;
 using Raylib_cs;
 
 namespace Baballe
@@ -9,8 +10,10 @@ namespace Baballe
     {
         public Playground Playground { get; }
 
-        public Vector2 Player = new Vector2(0, 0);
-        public float SpeedX = 0;
+        public Point2D PlayerPoint = new Point2D(0, 0);
+        public Vector2 PlayerPosition = new Vector2(0, 0);
+        public float TimePerCell = 0;
+        public int DeltaX = 1;
         public int DeltaY = 0;
 
         public int Score = 0;
@@ -21,83 +24,93 @@ namespace Baballe
 
         private IPlaygroundDrawer Drawer = new BasicPlaygroundDrawer();
 
-        public Game(Playground playground, int SpeedFactor)
+        public Game(Playground playground, int nbCellsPerSecond)
         {
             Playground = playground;
-            SpeedX = playground.CellSize*SpeedFactor;
-            int gridX;
-            int gridY;
-            Playground.PickRandomEmptyPosition(out gridX, out gridY);
-            Player.X = (gridX + 0.5f) * Playground.CellSize;
-            Player.Y = (gridY + 0.5f) * Playground.CellSize;
+            TimePerCell = 1f / nbCellsPerSecond;
+            PlayerPoint = Playground.PickStartingPoint();
         }
 
+        public void Reset()
+        {
+            GameOver = false;
+            CrashedOnWall = false;
+            Score = 0;
+            DeltaX = 1;
+            DeltaY = 0;
+            Paused = true;
+            Playground.Initialize();
+            PlayerPoint = Playground.PickStartingPoint();
+        }
+
+        
+        public Vector2 PlaygroundCenter()
+        {
+            return Playground.Center;
+        }
+        
         public void Resume()
         {
             Paused = false;
         }
 
-        public void Update(float dt)
+
+        private float TimeOnCell = 0;
+
+        public bool Update(float dt)
         {
             if (GameOver || Paused)
             {
-                return;
+                return false;
             }
 
-            int cellSize = Playground.CellSize;
-            var oldX = Player.X;
-            var newX = oldX + SpeedX * dt;
-            var oldGridX = (int) (oldX / cellSize);
-            var newGridY = (int) (newX / cellSize);
-            
-            
-            var center = (oldGridX + 0.5f) * cellSize;                
-            float newY;
-            if (oldGridX == newGridY && (Math.Sign(center-oldX) == Math.Sign(newX - center)))
+            int posX;
+            int posY;
+
+            TimeOnCell += dt;
+            if (TimeOnCell > TimePerCell)
             {
-                newY = Player.Y + DeltaY * cellSize;
+                posX = PlayerPoint.X + DeltaX;
+                posY = PlayerPoint.Y + DeltaY;
                 DeltaY = 0;
+                TimeOnCell -= TimePerCell;
             }
             else
             {
-                newY = Player.Y;
+                return false;
             }
 
+            var bounced = false;
+            do
+            {
+                var cellType = Playground.Cells[posX, posY];
 
-            int gridX;
-            if (SpeedX > 0)
-            {
-                gridX = (int) Math.Floor(Player.X / cellSize + 0.5);
-            }
-            else
-            {
-                gridX = (int) Math.Floor(Player.X / cellSize - 0.5);
-            }
+                if (cellType == CellType.Empty)
+                {
+                    PlayerPoint = new Point2D(posX, posY);
+                    return bounced;
+                }
 
-            var gridY = (int) Player.Y / cellSize;
+                if (cellType == CellType.Wall)
+                {
+                    GameOver = true;
+                    CrashedOnWall = true;
+                    return bounced;
+                }
 
-            var cellType = Playground.Cells[gridX, gridY];
+                bounced = true;
 
-            if (cellType == CellType.Empty)
-            {
-                Player.X = newX;
-                Player.Y = newY;
-            }
-            else if (cellType == CellType.Border)
-            {
-                SpeedX = -SpeedX;
-            }
-            else if (cellType == CellType.Wall)
-            {
-                CrashedOnWall = true;
-                GameOver = true;
-            }
-            else if (cellType == CellType.Coin)
-            {
-                SpeedX = -SpeedX;
-                GameOver = Playground.RemoveCoin(gridX, gridY);
-                Score += 1;
-            }
+                if (cellType == CellType.Coin)
+                {
+                    GameOver = Playground.RemoveCoin(posX, posY);
+                    Score += 1;
+                }
+
+                DeltaX = -DeltaX;
+                posX = posX + 2 * DeltaX;
+            } while (!GameOver);
+
+            return true;
         }
 
         public void Draw()
@@ -115,77 +128,32 @@ namespace Baballe
         private void DrawPlayer()
         {
             var cellSize = Playground.CellSize;
-            Raylib.DrawCircleV(Player, cellSize * 0.5f, Color.GREEN);
+            PlayerPosition.X = (PlayerPoint.X + 0.5f) * cellSize;
+            PlayerPosition.Y = (PlayerPoint.Y + 0.5f) * cellSize;
+            Raylib.DrawCircleV(PlayerPosition, cellSize * 0.5f, Color.GREEN);
         }
+        
 
 
-        public void SetupCamera(Camera2D camera)
-        {
-            var width = Raylib.GetScreenWidth();
-            var height = Raylib.GetScreenHeight();
-            camera.offset.X = width * 0.5f;
-            camera.offset.Y = height * 0.5f;
-            camera.target = Playground.Center;
-            camera.zoom = Math.Min(width / Playground.Width, height / Playground.Height);
-        }
-
-
-        static void Main(string[] args)
-        {
-            Raylib.InitWindow(800, 480, "Baballe");
-            Raylib.SetWindowState(ConfigFlag.FLAG_WINDOW_RESIZABLE);
-
-            var game = new Game(Playground.Create(20, 32, 20),8);
-
-            var camera = new Camera2D();
-
-
-            Raylib.SetTargetFPS(60); // Set our game to run at 60 frames-per-second
-
-            camera.zoom = 1;
-            double lastTime = -1;
-            while (!Raylib.WindowShouldClose())
-            {
-                if (lastTime < 0)
-                {
-                    lastTime = Raylib.GetTime();
-                }
-                else
-                {
-                    double currentTime = Raylib.GetTime();
-                    float dt = (float) (currentTime - lastTime);
-                    lastTime = currentTime;
-                    game.Update(dt);
-                }
-
-                if (Raylib.IsKeyPressed(KeyboardKey.KEY_SPACE)) game.Resume();
-                if (Raylib.IsKeyDown(KeyboardKey.KEY_UP)) game.MoveUp();
-                else if (Raylib.IsKeyDown(KeyboardKey.KEY_DOWN)) game.MoveDown();
-
-
-                game.SetupCamera(camera);
-                Raylib.BeginDrawing();
-                Raylib.ClearBackground(Color.WHITE);
-                
-                Raylib.BeginMode2D(camera);
-
-                game.Draw();
-
-                Raylib.EndMode2D();
-                Raylib.EndDrawing();
-            }
-
-            Raylib.CloseWindow();
-        }
-
-        private void MoveUp()
+        public void MoveUp()
         {
             DeltaY = -1;
         }
 
-        private void MoveDown()
+        public void MoveDown()
         {
             DeltaY = +1;
         }
+
+        public float PlaygroundWidth()
+        {
+            return Playground.Width;
+        }
+
+        public float PlaygroundHeight()
+        {
+            return Playground.Height;
+        }
+
     }
 }

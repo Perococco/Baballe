@@ -7,15 +7,15 @@ namespace Baballe
         public void Draw(Playground playground)
         {
             var cellSize = playground.CellSize;
-            foreach (var wall in playground.Borders())
+            foreach (var wall in playground.Borders)
             {
                 DrawBorder(cellSize,wall);
             }
-            foreach (var wall in playground.Walls())
+            foreach (var wall in playground.Walls)
             {
                 DrawWall(cellSize,wall);
             }
-            foreach (var coin in playground.Coins())
+            foreach (var coin in playground.Coins)
             {
                 DrawCoin(cellSize,coin);
             }

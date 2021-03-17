@@ -14,21 +14,17 @@ namespace Baballe
             return playGround;
         }
 
-        public Vector2 Position { get; set; } = Vector2.Zero;
-
-        public int NbRows { get; }
-        public int NbColumns { get; }
-
-        public int CellSize { get; }
-
-        public int Width { get; }
-        public int Height { get; }
+        public readonly int NbRows;
+        public readonly int NbColumns;
+        public readonly int CellSize;
+        public readonly int Width;
+        public readonly int Height;
 
         public CellType[,] Cells { get; }
 
-        private readonly ISet<Point2D> _borders = new HashSet<Point2D>();
-        private readonly ISet<Point2D> _coins  = new HashSet<Point2D>();
-        private readonly ISet<Point2D> _walls = new HashSet<Point2D>();
+        public readonly ISet<Point2D> Borders = new HashSet<Point2D>();
+        public readonly ISet<Point2D> Coins = new HashSet<Point2D>();
+        public readonly ISet<Point2D> Walls = new HashSet<Point2D>();
         public Vector2 Center { get; private set; }
 
         private Playground(int nbRows, int nbColumns, int cellSize)
@@ -39,110 +35,67 @@ namespace Baballe
             Cells = new CellType[nbColumns, nbRows];
             Height = nbRows * CellSize;
             Width = nbColumns * CellSize;
+            Center = new Vector2(CellSize * NbColumns * 0.5f, CellSize * NbRows * 0.5f);
         }
 
-        public IEnumerable<Point2D> Borders()
-        {
-            return _borders;
-        }
-
-        public IEnumerable<Point2D> Coins()
-        {
-            return _coins;
-        }
-
-        public IEnumerable<Point2D> Walls()
-        {
-            return _walls;
-        }
-        
         public void Initialize()
         {
-            Center = new Vector2(CellSize * NbColumns * 0.5f, CellSize * NbRows * 0.5f);
-            var nbItems = (NbColumns - 2) * (NbRows - 2) / 20;
-
-            ClearPlayground();
-            SetupBorders();
-            AddAtRandomPosition(CellType.Coin, nbItems);
-            AddAtRandomPosition(CellType.Wall, nbItems);
+            PlaygroundInitializer.Initialize(this);
         }
 
-        private void ClearPlayground()
+        public Point2D PickStartingPoint()
         {
-            for (var y = 0; y < NbRows; y++)
+            Point2D? result = null;
+            int nbPicked = 0;
+            for (int x = 1; x < NbColumns-1; x++)
             {
-                for (var x = 0; x < NbColumns; x++)
+                for (int y = 1; y < NbRows-1; y++)
                 {
-                    Cells[x, y] = CellType.Empty;
+                    if (IsNotWall(x - 1, y) && IsEmpty(x, y) && IsNotWall(x + 1, y))
+                    {
+                        var point = new Point2D(x, y);
+                        var value = Raylib.GetRandomValue(0, nbPicked);
+                        if (value == nbPicked) 
+                        {
+                            result = point;
+                        }
+
+                        nbPicked++;
+                    }
                 }
             }
+
+            return result ?? throw new NoValidStartingPositionFound();
         }
 
-        private void SetupBorders()
+        private bool IsNotWall(int x, int y)
         {
-            for (var y = 0; y < NbRows; y++)
-            {
-                AddCell(0, y, CellType.Border);
-                AddCell(NbColumns - 1, y, CellType.Border);
-            }
-
-            for (var x = 0; x < NbColumns; x++)
-            {
-                AddCell(x, 0, CellType.Border);
-                AddCell(x, NbRows - 1, CellType.Border);
-            }
+            return Cells[x, y] != CellType.Wall;
+        }
+        private bool IsEmpty(int x, int y)
+        {
+            return Cells[x, y] == CellType.Empty;
         }
 
-        private void AddAtRandomPosition(CellType cellType, int nb)
+        public void SetCellType(Point2D position, CellType cellType)
         {
-            for (int i = 0; i < nb; i++)
+            Func<Point2D, bool> action = cellType switch
             {
-                AddAtRandomPosition(cellType);
-            }
-        }
-
-        private void AddAtRandomPosition(CellType cellType)
-        {
-            int x;
-            int y;
-            PickRandomEmptyPosition(out x, out y);
-            AddCell(x, y, cellType);
-        }
-
-
-        private void SetCellType(Point2D position, CellType cellType)
-        {
-            Func<Point2D,bool> action = cellType switch
-            {
-                CellType.Border => _borders.Add,
-                CellType.Coin => _coins.Add,
-                CellType.Wall => _walls.Add,
+                CellType.Border => Borders.Add,
+                CellType.Coin => Coins.Add,
+                CellType.Wall => Walls.Add,
                 _ => p => true,
             };
             action.Invoke(position);
+            Cells[position.X, position.Y] = cellType;
         }
 
-        private void AddCell(int x, int y, CellType cellType)
-        {
-            var point = new Point2D(x, y);
-            SetCellType(point, cellType);
-            Cells[x, y] = cellType;
-        }
-
-        public void PickRandomEmptyPosition(out int x, out int y)
-        {
-            do
-            {
-                x = Raylib.GetRandomValue(1, NbColumns - 2);
-                y = Raylib.GetRandomValue(1, NbRows - 2);
-            } while (Cells[x, y] != CellType.Empty);
-        }
 
         public bool RemoveCoin(int gridX, int gridY)
         {
-            _coins.Remove(new Point2D(gridX, gridY));
+            Coins.Remove(new Point2D(gridX, gridY));
             Cells[gridX, gridY] = CellType.Empty;
-            return _coins.Count == 0;
+            return Coins.Count == 0;
         }
     }
 }
