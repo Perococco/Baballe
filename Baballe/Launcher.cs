@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Numerics;
+using System.Resources;
 using Raylib_cs;
 
 namespace Baballe
@@ -24,7 +26,24 @@ namespace Baballe
         public Launcher()
         {
         }
+    
+        /// <summary>
+        /// Hack till I understand how to embed resource
+        /// </summary>
+        /// <returns>The path to the embedded resource (if you are lucky)</returns>
+        public string GuessFontPath()
+        {
+            var currentDir = Directory.GetCurrentDirectory();
+            var idx = currentDir.IndexOf("Baballe/Baballe");
+            if (idx < 0)
+            {
+                return "";
+            }
 
+            return currentDir.Substring(0, idx + "Baballe/Baballe".Length) + "/Resources/Roboto-Regular.ttf";
+
+        }
+        
         public void Initialize()
         {
             Raylib.SetConfigFlags(ConfigFlag.FLAG_MSAA_4X_HINT); 
@@ -32,7 +51,9 @@ namespace Baballe
             Raylib.SetWindowState(ConfigFlag.FLAG_WINDOW_RESIZABLE);
             Raylib.SetTargetFPS(60); // Set our game to run at 60 frames-per-second
 
-            _font = Raylib.LoadFont("/usr/share/fonts/ubuntu/UbuntuMono-R.ttf");
+            Console.WriteLine(GuessFontPath());
+            
+            _font = Raylib.LoadFont(GuessFontPath());
 
             _game = new Game(Playground.Create(40, 64, 20), 16);
             _header = new Header(_font);
